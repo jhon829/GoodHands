@@ -1,0 +1,57 @@
+from pydantic_settings import BaseSettings
+from typing import List
+
+class Settings(BaseSettings):
+    # 데이터베이스 설정
+    database_url: str = "postgresql://user:password@localhost/goodhands"
+    
+    # JWT 설정
+    secret_key: str = "your-secret-key-here-please-change-in-production"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    
+    # 파일 업로드 설정
+    upload_dir: str = "uploads"
+    max_file_size: int = 10485760  # 10MB
+    base_url: str = "http://localhost:8000"
+    
+    # AI 서비스 설정
+    ai_service_url: str = "http://localhost:8001"
+    
+    # 환경 설정
+    environment: str = "development"
+    debug: bool = True
+    
+    # CORS 설정
+    cors_origins: List[str] = [
+        "http://localhost:3000",
+        "http://localhost:8080",
+        "http://localhost:19006",  # React Native 개발 서버
+        "exp://localhost:19000"   # Expo 개발 서버
+    ]
+    
+    # 페이지네이션 설정
+    default_page_size: int = 20
+    max_page_size: int = 100
+    
+    # 캐시 설정
+    cache_expire_minutes: int = 60
+    
+    # 로깅 설정
+    log_level: str = "INFO"
+    log_file: str = "app.log"
+    
+    # 보안 설정
+    password_min_length: int = 8
+    max_login_attempts: int = 5
+    
+    # 푸시 알림 설정 (Firebase)
+    firebase_project_id: str = ""
+    firebase_private_key: str = ""
+    firebase_client_email: str = ""
+    
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+
+settings = Settings()

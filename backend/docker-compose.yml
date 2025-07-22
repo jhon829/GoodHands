@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 데이터베이스
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: goodhands
+      POSTGRES_USER: goodhands_user
+      POSTGRES_PASSWORD: goodhands_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - goodhands_network
+
+  # FastAPI 백엔드
+  backend:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://goodhands_user:goodhands_password@postgres:5432/goodhands
+      SECRET_KEY: your-production-secret-key-here
+      ENVIRONMENT: production
+      DEBUG: false
+    depends_on:
+      - postgres
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./uploads:/app/uploads
+    networks:
+      - goodhands_network
+    restart: unless-stopped
+
+  # Nginx 리버스 프록시 (선택사항)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+    networks:
+      - goodhands_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  goodhands_network:
+    driver: bridge
