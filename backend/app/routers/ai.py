@@ -354,3 +354,111 @@ async def get_trending_keywords(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"인기 키워드 조회 중 오류가 발생했습니다: {str(e)}"
         )
+
+# AI 분석 트리거 및 콜백 엔드포인트 추가
+from app.services.ai_trigger import AIAnalysisTrigger
+from app.models.enhanced_care import WeeklyChecklistScore, SpecialNote
+
+@router.post("/trigger-ai-analysis")
+async def trigger_ai_analysis(
+    care_session_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """AI 분석 트리거 (백엔드 내부 처리)"""
+    
+    # 케어 세션 및 권한 확인
+    care_session = db.query(CareSession).filter(
+        CareSession.id == care_session_id
+    ).first()
+    
+    if not care_session:
+        raise HTTPException(status_code=404, detail="케어 세션을 찾을 수 없습니다")
+    
+    # AI 분석 서비스 실행
+    ai_trigger = AIAnalysisTrigger(db)
+    try:
+        result = await ai_trigger.analyze_care_session(care_session_id)
+        return result
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"AI 분석 실행 실패: {str(e)}"
+        )
+
+@router.get("/weekly-scores/{senior_id}")
+async def get_weekly_scores(
+    senior_id: int,
+    weeks: int = 4,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """시니어의 주간 점수 조회"""
+    
+    from datetime import datetime, timedelta
+    
+    # 권한 확인
+    senior = db.query(Senior).filter(Senior.id == senior_id).first()
+    if not senior:
+        raise HTTPException(status_code=404, detail="시니어를 찾을 수 없습니다")
+    
+    # 최근 N주 데이터 조회
+    weeks_ago = datetime.now() - timedelta(weeks=weeks)
+    
+    weekly_scores = db.query(WeeklyChecklistScore).filter(
+        WeeklyChecklistScore.senior_id == senior_id,
+        WeeklyChecklistScore.week_start_date >= weeks_ago.date()
+    ).order_by(WeeklyChecklistScore.week_start_date).all()
+    
+    return {
+        "senior_id": senior_id,
+        "senior_name": senior.name,
+        "period_weeks": weeks,
+        "weekly_scores": [
+            {
+                "week_start": score.week_start_date.isoformat(),
+                "week_end": score.week_end_date.isoformat(),
+                "score_percentage": float(score.score_percentage),
+                "total_score": score.total_score,
+                "checklist_count": score.checklist_count,
+                "trend_indicator": score.trend_indicator,
+                "score_breakdown": score.score_breakdown
+            } for score in weekly_scores
+        ]
+    }
+
+@router.get("/special-notes/{senior_id}")
+async def get_special_notes(
+    senior_id: int,
+    limit: int = 10,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """시니어의 특이사항 조회"""
+    
+    # 권한 확인
+    senior = db.query(Senior).filter(Senior.id == senior_id).first()
+    if not senior:
+        raise HTTPException(status_code=404, detail="시니어를 찾을 수 없습니다")
+    
+    # 최근 특이사항 조회
+    special_notes = db.query(SpecialNote).filter(
+        SpecialNote.senior_id == senior_id
+    ).order_by(SpecialNote.created_at.desc()).limit(limit).all()
+    
+    return {
+        "senior_id": senior_id,
+        "senior_name": senior.name,
+        "special_notes": [
+            {
+                "id": note.id,
+                "note_type": note.note_type,
+                "short_summary": note.short_summary,
+                "detailed_content": note.detailed_content,
+                "priority_level": note.priority_level,
+                "is_resolved": note.is_resolved,
+                "created_at": note.created_at.isoformat(),
+                "resolved_at": note.resolved_at.isoformat() if note.resolved_at else None
+            } for note in special_notes
+        ]
+    }

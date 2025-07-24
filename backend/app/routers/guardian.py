@@ -358,3 +358,33 @@ async def get_guardian_profile(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"프로필 조회 중 오류가 발생했습니다: {str(e)}"
         )
+
+# 추이 분석 엔드포인트 추가
+from app.services.trend_analysis import TrendAnalysisService
+
+@router.get("/trend-analysis/{senior_id}")
+async def get_trend_analysis(
+    senior_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """시니어 상태 변화 추이 분석"""
+    
+    # 권한 확인 (가디언이 해당 시니어의 보호자인지)
+    senior = db.query(Senior).filter(
+        Senior.id == senior_id,
+        Senior.guardian_id == current_user.guardian_profile.id
+    ).first()
+    
+    if not senior:
+        raise HTTPException(status_code=404, detail="시니어 정보를 찾을 수 없습니다")
+    
+    # 추이 분석 수행
+    trend_service = TrendAnalysisService(db)
+    analysis = trend_service.analyze_4week_trend(senior_id)
+    
+    return {
+        "senior_name": senior.name,
+        "analysis_date": datetime.now().isoformat(),
+        "trend_analysis": analysis
+    }
