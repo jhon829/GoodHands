@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text, JSON, Float
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text, JSON, Float, DECIMAL
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -47,6 +47,9 @@ class ChecklistResponse(Base):
     question_text = Column(Text)
     answer = Column(JSON)  # Boolean, String, Number 등 다양한 답변 형식
     notes = Column(Text)
+    score_value = Column(Integer)  # 점수화된 값
+    category = Column(String(50))  # 카테고리 분류
+    weight = Column(DECIMAL(3,2), default=1.0)  # 가중치
     created_at = Column(DateTime, server_default=func.now())
     
     # 관계 설정

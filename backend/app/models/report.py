@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text, JSON
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text, JSON, DECIMAL
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -13,6 +13,15 @@ class AIReport(Base):
     content = Column(Text, nullable=False)  # 리포트 본문
     ai_comment = Column(Text)  # AI 코멘트
     status = Column(String(20), default="generated")  # generated, read, reviewed
+    
+    # 새로 추가된 컬럼들
+    checklist_score_total = Column(Integer)
+    checklist_score_percentage = Column(DECIMAL(5,2))
+    trend_comparison = Column(JSON)
+    special_notes_summary = Column(Text)
+    n8n_workflow_id = Column(String(100))
+    ai_processing_status = Column(String(20), default="pending")  # pending, processing, completed, failed
+    
     created_at = Column(DateTime, server_default=func.now())
     
     # 관계 설정
