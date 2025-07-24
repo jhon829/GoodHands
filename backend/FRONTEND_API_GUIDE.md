@@ -1,440 +1,820 @@
-# 🎨 프론트엔드 개발자를 위한 API 가이드
+# 🏥 Good Hands API 가이드 (프론트엔드 개발자용)
 
-## 📋 개발 환경 설정
+## 📋 목차
+1. [개발 환경 설정](#개발-환경-설정)
+2. [인증 시스템](#인증-시스템)
+3. [API 엔드포인트](#api-엔드포인트)
+4. [데이터 구조](#데이터-구조)
+5. [에러 처리](#에러-처리)
+6. [파일 업로드](#파일-업로드)
+7. [실제 사용 예제](#실제-사용-예제)
 
-### API 서버 정보
-- **Base URL**: `http://localhost:8000`
-- **API 문서**: `http://localhost:8000/docs` (Swagger UI)
-- **API 스키마**: `http://localhost:8000/openapi.json`
+---
 
-### 인증 방식
-JWT Bearer Token 방식을 사용합니다.
+## 개발 환경 설정
 
-```javascript
-// 1. 로그인
-const loginResponse = await fetch('/api/auth/login', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    user_code: 'CG001',
-    password: 'password123'
-  })
-});
-
-const { access_token, user_type } = await loginResponse.json();
-
-// 2. 이후 모든 요청에 토큰 포함
-const apiCall = await fetch('/api/caregiver/home', {
-  headers: {
-    'Authorization': `Bearer ${access_token}`,
-    'Content-Type': 'application/json'
-  }
-});
+### 🔗 Base URL
+```
+개발: http://localhost:8000
+운영: [운영 서버 URL]
 ```
 
-## 🔑 테스트 계정
+### 📚 API 문서
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
 
-| 사용자 유형 | 아이디 | 비밀번호 | 설명 |
-|------------|--------|----------|------|
-| 케어기버 | CG001 | password123 | 케어기버 전용 기능 테스트 |
-| 가디언 | GD001 | password123 | 가디언 전용 기능 테스트 |
-| 관리자 | AD001 | admin123 | 관리자 전용 기능 테스트 |
+### 🧪 테스트 계정
+```
+케어기버: CG001 / password123
+가디언:   GD001 / password123
+관리자:   AD001 / admin123
+```
 
-## 📱 주요 화면별 API 호출 순서
+---
 
-### 케어기버 앱
+## 인증 시스템
 
-#### 1️⃣ 로그인 화면
+### 🔐 JWT 기반 인증
+모든 API 요청에는 JWT 토큰이 필요합니다 (로그인 제외).
+
+#### 로그인
 ```javascript
-// 로그인
 POST /api/auth/login
+Content-Type: application/json
+
 {
   "user_code": "CG001",
   "password": "password123"
 }
-
-// 응답
-{
-  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
-  "token_type": "bearer",
-  "expires_in": 1800,
-  "user_type": "caregiver"
-}
 ```
 
-#### 2️⃣ 홈 화면
+#### 응답
 ```javascript
-// 홈 화면 데이터 조회
-GET /api/caregiver/home
-
-// 응답
 {
-  "success": true,
-  "data": {
-    "caregiver_name": "김케어",
-    "today_sessions": [...],
-    "seniors": [...],
-    "notifications": [...]
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "expires_in": 1800,
+  "user_type": "caregiver",
+  "user_info": {
+    "id": 1,
+    "user_code": "CG001",
+    "user_type": "caregiver",
+    "email": "caregiver@example.com",
+    "name": "김간병",
+    "phone": "010-1234-5678"
   }
 }
 ```
 
-#### 3️⃣ 출근/퇴근 체크
+#### 인증 헤더 설정
 ```javascript
-// 출근 체크
-POST /api/caregiver/attendance/checkin
-FormData: {
-  "senior_id": 1,
-  "location": "서울시 강남구",
-  "gps_lat": 37.5665,
-  "gps_lng": 126.9780,
-  "photo": File
-}
+// Axios 예제
+axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
-// 퇴근 체크  
-POST /api/caregiver/attendance/checkout
-FormData: {
-  "senior_id": 1,
-  "location": "서울시 강남구", 
-  "gps_lat": 37.5665,
-  "gps_lng": 126.9780,
-  "photo": File
+// Fetch 예제
+fetch('/api/caregiver/home', {
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  }
+})
+```
+
+---
+
+## API 엔드포인트
+
+### 👨‍⚕️ 케어기버 API
+
+#### 홈 화면 데이터
+```javascript
+GET /api/caregiver/home
+Authorization: Bearer <token>
+
+// 응답
+{
+  "caregiver_name": "김간병",
+  "today_sessions": [
+    {
+      "id": 1,
+      "senior_name": "박할머니",
+      "start_time": "2024-01-15T09:00:00",
+      "status": "in_progress"
+    }
+  ],
+  "seniors": [
+    {
+      "id": 1,
+      "name": "박할머니",
+      "age": 85,
+      "diseases": ["치매", "당뇨"]
+    }
+  ],
+  "unread_notifications": []
 }
 ```
 
-#### 4️⃣ 체크리스트 제출
+#### 출근 체크인
+```javascript
+POST /api/caregiver/attendance/checkin
+Content-Type: multipart/form-data
+
+FormData:
+- senior_id: 1
+- location: "서울시 강남구 테헤란로 123"
+- gps_lat: 37.5665
+- gps_lng: 126.9780
+- photo: [File]
+```
+
+#### 퇴근 체크아웃
+```javascript
+POST /api/caregiver/attendance/checkout
+Content-Type: multipart/form-data
+
+FormData:
+- session_id: 1
+- location: "서울시 강남구 테헤란로 123"
+- gps_lat: 37.5665
+- gps_lng: 126.9780
+- photo: [File]
+```
+
+#### 체크리스트 제출
 ```javascript
 POST /api/caregiver/checklist
+Content-Type: application/json
+
 {
   "senior_id": 1,
   "responses": [
     {
-      "question_key": "health_check",
-      "question_text": "건강상태는 어떠신가요?",
-      "answer": true,
-      "notes": "특이사항 없음"
+      "question_key": "blood_pressure_check",
+      "question_text": "혈압 측정을 완료했나요?",
+      "answer": {
+        "value": true,
+        "systolic": 120,
+        "diastolic": 80
+      },
+      "notes": "정상 범위 내"
+    },
+    {
+      "question_key": "medication_taken",
+      "question_text": "약 복용을 도왔나요?",
+      "answer": {
+        "value": true,
+        "medications": ["혈압약", "당뇨약"]
+      },
+      "notes": "모든 약 정시 복용"
     }
   ]
 }
 ```
 
-#### 5️⃣ 돌봄노트 제출
+#### 돌봄노트 제출
 ```javascript
-POST /api/caregiver/care-note  
+POST /api/caregiver/care-note
+Content-Type: application/json
+
 {
   "senior_id": 1,
   "notes": [
     {
       "question_type": "special_moments",
-      "question_text": "오늘의 특별한 순간",
-      "content": "오늘 웃으면서 TV를 보셨습니다"
+      "question_text": "오늘 특별한 순간이나 기억에 남는 일이 있었나요?",
+      "content": "오늘 손녀 사진을 보시며 많이 웃으셨습니다."
+    },
+    {
+      "question_type": "family_longing",
+      "question_text": "가족에 대한 그리움을 표현하셨나요?",
+      "content": "아들 이야기를 자주 하시며 보고 싶다고 하셨습니다."
     }
   ]
 }
 ```
 
-#### 6️⃣ AI 분석 트리거
-```javascript
-POST /api/ai/trigger-ai-analysis
-{
-  "care_session_id": 1
-}
+### 👨‍👩‍👧‍👦 가디언 API
 
-// 응답
-{
-  "success": true,
-  "message": "AI 분석이 완료되었습니다",
-  "report_id": 15,
-  "ai_result": {
-    "ai_comment": "오늘 어르신이...",
-    "keywords": ["건강함", "기분좋음"],
-    "score_percentage": 85.5
-  }
-}
-```
-
-### 가디언 앱
-
-#### 1️⃣ 홈 화면
+#### 홈 화면 데이터
 ```javascript
 GET /api/guardian/home
+Authorization: Bearer <token>
 
 // 응답
 {
-  "success": true,
-  "data": {
-    "guardian_name": "김가디언",
-    "seniors": [...],
-    "recent_reports": [...],
-    "unread_notifications": [...]
-  }
+  "guardian_name": "박아들",
+  "seniors": [
+    {
+      "id": 1,
+      "name": "박할머니",
+      "age": 85,
+      "latest_report_date": "2024-01-15"
+    }
+  ],
+  "recent_reports": [
+    {
+      "id": 1,
+      "date": "2024-01-15",
+      "keywords": ["건강함", "기분좋음"],
+      "summary": "오늘 어머니께서는 컨디션이 좋으셨습니다..."
+    }
+  ],
+  "unread_notifications": []
 }
 ```
 
-#### 2️⃣ AI 리포트 목록
+#### 리포트 목록 조회
 ```javascript
-GET /api/guardian/reports?senior_id=1&page=1&size=20
+GET /api/guardian/reports?page=1&size=20&senior_id=1
+Authorization: Bearer <token>
 
-// 응답 (페이지네이션)
+// 응답
 {
-  "success": true,
-  "items": [...],
+  "items": [
+    {
+      "id": 1,
+      "date": "2024-01-15",
+      "senior_name": "박할머니",
+      "keywords": ["건강함", "기분좋음", "가족그리움"],
+      "ai_score": 4.2,
+      "created_at": "2024-01-15T18:00:00"
+    }
+  ],
   "total": 50,
   "page": 1,
   "size": 20,
-  "has_next": true
+  "pages": 3
 }
 ```
 
-#### 3️⃣ 추이 분석
+#### 리포트 상세 조회
 ```javascript
-GET /api/guardian/trend-analysis/1
+GET /api/guardian/report/1
+Authorization: Bearer <token>
 
 // 응답
 {
-  "success": true,
-  "data": {
-    "trend": "improving",
-    "trend_strength": 7.2,
-    "average_score": 78.5,
-    "weekly_data": [...],
-    "category_analysis": {...},
-    "alerts": [...],
-    "recommendations": [...]
-  }
+  "id": 1,
+  "date": "2024-01-15",
+  "senior_name": "박할머니",
+  "caregiver_name": "김간병",
+  "keywords": ["건강함", "기분좋음", "가족그리움"],
+  "content": "오늘 박할머니께서는 전반적으로 건강하고 좋은 상태를 보이셨습니다...",
+  "ai_comment": "어머니께서 가족을 많이 그리워하고 계십니다. 가능하다면 화상통화를 해보세요.",
+  "checklist_data": {
+    "health_score": 4.5,
+    "mental_score": 4.0,
+    "daily_score": 4.2
+  },
+  "special_notes": [
+    "손녀 사진을 보며 웃으심",
+    "아들 이야기를 자주 하심"
+  ]
 }
 ```
 
-#### 4️⃣ 피드백 전송
+#### 피드백 전송
 ```javascript
 POST /api/guardian/feedback
+Content-Type: application/json
+
 {
-  "ai_report_id": 15,
-  "message": "오늘 리포트 잘 받았습니다. 감사합니다.",
-  "requirements": "내일은 산책 시간을 늘려주세요",
-  "rating": 5
+  "ai_report_id": 1,
+  "message": "케어기버님 감사합니다. 어머니께서 좋아하시는 음식을 더 챙겨주세요.",
+  "requirements": "혈압 체크를 더 자주 해주세요."
 }
 ```
 
-## 🚨 에러 처리
+### 🤖 AI API
 
-모든 API는 표준화된 에러 응답을 반환합니다:
-
+#### AI 리포트 생성
 ```javascript
-// 에러 응답 형식
+POST /api/ai/generate-report
+Content-Type: application/json
+
 {
-  "success": false,
-  "detail": "에러 메시지",
-  "error_code": "AUTH_001",
-  "timestamp": "2025-01-24T10:00:00Z",
-  "path": "/api/auth/login"
+  "session_id": 1
+}
+
+// 응답
+{
+  "report_id": 1,
+  "status": "generated",
+  "keywords": ["건강함", "기분좋음", "가족그리움"],
+  "ai_score": 4.2,
+  "message": "AI 리포트가 성공적으로 생성되었습니다."
+}
+```
+
+#### 추이 분석 조회
+```javascript
+GET /api/ai/trend-analysis/1?weeks=4
+Authorization: Bearer <token>
+
+// 응답
+{
+  "senior_id": 1,
+  "analysis_period": "4주",
+  "trend": "improving",
+  "score_changes": [
+    {"week": 1, "score": 3.8},
+    {"week": 2, "score": 4.0},
+    {"week": 3, "score": 4.1},
+    {"week": 4, "score": 4.2}
+  ],
+  "insights": [
+    "전반적인 건강 상태가 개선되고 있습니다",
+    "정신적 안정감이 증가했습니다"
+  ],
+  "recommendations": [
+    "현재 케어 방식을 유지하세요",
+    "가족과의 소통을 늘려보세요"
+  ]
+}
+```
+
+---
+
+## 데이터 구조
+
+### 🏥 핵심 모델
+
+#### Senior (시니어)
+```javascript
+{
+  "id": 1,
+  "name": "박할머니",
+  "age": 85,
+  "gender": "female",
+  "photo": "/uploads/senior_1_photo.jpg",
+  "diseases": ["치매", "당뇨", "고혈압"],
+  "caregiver_name": "김간병",
+  "guardian_name": "박아들"
+}
+```
+
+#### CareSession (돌봄 세션)
+```javascript
+{
+  "id": 1,
+  "senior_id": 1,
+  "caregiver_id": 1,
+  "start_time": "2024-01-15T09:00:00",
+  "end_time": "2024-01-15T17:00:00",
+  "status": "completed", // "in_progress", "completed", "cancelled"
+  "start_location": "서울시 강남구",
+  "end_location": "서울시 강남구",
+  "start_photo": "/uploads/checkin_1.jpg",
+  "end_photo": "/uploads/checkout_1.jpg"
+}
+```
+
+#### AIReport (AI 리포트)
+```javascript
+{
+  "id": 1,
+  "care_session_id": 1,
+  "keywords": ["건강함", "기분좋음", "가족그리움"],
+  "content": "상세 리포트 내용...",
+  "ai_comment": "AI가 제안하는 구체적 행동...",
+  "ai_score": 4.2,
+  "special_notes": ["특이사항 1", "특이사항 2"],
+  "created_at": "2024-01-15T18:00:00"
+}
+```
+
+#### Checklist Response (체크리스트 응답)
+```javascript
+{
+  "question_key": "blood_pressure_check",
+  "question_text": "혈압 측정을 완료했나요?",
+  "category": "health", // "health", "mental", "physical", "social", "daily"
+  "answer": {
+    "value": true,
+    "systolic": 120,
+    "diastolic": 80,
+    "additional_data": {}
+  },
+  "notes": "정상 범위 내",
+  "score": 5 // 1-5점
+}
+```
+
+---
+
+## 에러 처리
+
+### 🚨 표준 에러 응답
+```javascript
+{
+  "error": "UNAUTHORIZED",
+  "message": "토큰이 유효하지 않습니다",
+  "status_code": 401,
+  "timestamp": "2024-01-15T10:30:00Z"
 }
 ```
 
 ### 주요 에러 코드
+- `400 BAD_REQUEST`: 잘못된 요청 데이터
+- `401 UNAUTHORIZED`: 인증 토큰 없음/만료
+- `403 FORBIDDEN`: 권한 없음
+- `404 NOT_FOUND`: 리소스 없음
+- `422 VALIDATION_ERROR`: 데이터 유효성 검사 실패
+- `500 INTERNAL_ERROR`: 서버 내부 오류
 
-| 에러 코드 | 설명 | HTTP 상태 |
-|----------|------|-----------|
-| AUTH_001 | 잘못된 인증 정보 | 401 |
-| AUTH_002 | 토큰 만료 | 401 |
-| AUTH_003 | 권한 부족 | 403 |
-| USER_001 | 사용자를 찾을 수 없음 | 404 |
-| CARE_001 | 시니어를 찾을 수 없음 | 404 |
-| FILE_001 | 파일 크기 초과 | 400 |
-| AI_001 | AI 분석 실패 | 500 |
-
-## 📊 데이터 모델
-
-### 시니어 정보
+### React Native 에러 처리 예제
 ```javascript
-{
-  "id": 1,
-  "name": "김시니어",
-  "age": 75,
-  "gender": "여성",
-  "photo": "http://localhost:8000/uploads/senior1.jpg",
-  "diseases": ["고혈압", "당뇨"],
-  "nursing_home": {
-    "name": "행복요양원",
-    "address": "서울시 강남구",
-    "phone": "02-1234-5678"
+// Axios interceptor
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // 토큰 만료 - 로그인 화면으로 이동
+      NavigationService.navigate('Login');
+    }
+    return Promise.reject(error);
   }
-}
+);
 ```
 
-### AI 리포트
+---
+
+## 파일 업로드
+
+### 📸 이미지 업로드
 ```javascript
-{
-  "id": 15,
-  "care_session_id": 1,
-  "keywords": ["건강함", "기분좋음", "가족그리움"],
-  "content": "오늘 어르신의 전반적인 상태는...",
-  "ai_comment": "어르신이 오늘 가족 이야기를 많이 하셨으니...",
-  "checklist_score_total": 42,
-  "checklist_score_percentage": 85.5,
-  "trend_comparison": {
-    "trend": "improving",
-    "change": 5.2,
-    "message": "지난 주 대비 5.2% 개선되었습니다"
-  },
-  "special_notes_summary": "특이사항 없음",
-  "status": "generated",
-  "created_at": "2025-01-24T10:00:00Z"
-}
+// React Native 예제
+const uploadImage = async (imageUri, endpoint) => {
+  const formData = new FormData();
+  formData.append('photo', {
+    uri: imageUri,
+    type: 'image/jpeg',
+    name: 'photo.jpg',
+  });
+  
+  try {
+    const response = await fetch(`${BASE_URL}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data',
+      },
+      body: formData,
+    });
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Upload failed:', error);
+  }
+};
 ```
 
-### 추이 분석 결과
+### 📁 파일 제한사항
+- **최대 크기**: 10MB
+- **지원 형식**: JPG, PNG, GIF, WebP
+- **저장 위치**: `/uploads/` 디렉토리
+- **접근 URL**: `http://localhost:8000/uploads/filename.jpg`
+
+---
+
+## 실제 사용 예제
+
+### 📱 React Native 전체 플로우
+
+#### 1. 로그인 및 토큰 저장
 ```javascript
-{
-  "trend": "improving",        // "improving", "stable", "declining"
-  "trend_strength": 7.2,       // 추세 강도 (0-10)
-  "average_score": 78.5,       // 평균 점수
-  "score_change": 5.2,         // 점수 변화
-  "weekly_data": [
-    {
-      "week": "2025-01-13",
-      "score": 75.0,
-      "trend_indicator": "stable",
-      "checklist_count": 3
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const login = async (userCode, password) => {
+  try {
+    const response = await fetch(`${BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_code: userCode,
+        password: password
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (response.ok) {
+      await AsyncStorage.setItem('access_token', data.access_token);
+      await AsyncStorage.setItem('user_type', data.user_type);
+      await AsyncStorage.setItem('user_info', JSON.stringify(data.user_info));
+      return data;
+    } else {
+      throw new Error(data.message);
     }
-  ],
-  "category_analysis": {
-    "health": {
-      "current_score": 4.2,
-      "trend": "improving",
-      "change": 0.3,
-      "average": 4.0
-    }
-  },
-  "alerts": [
-    {
-      "type": "score_drop",
-      "severity": "high",
-      "message": "이번 주 컨디션이 15.0% 급격히 저하되었습니다",
-      "recommendation": "가디언에게 즉시 연락하여 상태 확인이 필요합니다"
-    }
-  ],
-  "recommendations": [
-    "현재 상태가 좋아지고 있습니다! 지금의 케어 방식을 유지하세요",
-    "가디언께서 더 자주 안부 연락을 해주시면 더욱 좋을 것 같습니다"
-  ]
-}
+  } catch (error) {
+    console.error('Login error:', error);
+    throw error;
+  }
+};
 ```
 
-## 📁 파일 업로드
-
-### 이미지 업로드 (출근/퇴근 사진)
+#### 2. 케어기버 홈 화면 데이터 로딩
 ```javascript
-const formData = new FormData();
-formData.append('senior_id', '1');
-formData.append('location', '서울시 강남구');
-formData.append('gps_lat', '37.5665');
-formData.append('gps_lng', '126.9780');
-formData.append('photo', fileBlob, 'attendance.jpg');
+const CaregiverHome = () => {
+  const [homeData, setHomeData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    loadHomeData();
+  }, []);
+  
+  const loadHomeData = async () => {
+    try {
+      const token = await AsyncStorage.getItem('access_token');
+      const response = await fetch(`${BASE_URL}/api/caregiver/home`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setHomeData(data);
+      }
+    } catch (error) {
+      console.error('Failed to load home data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // UI 렌더링...
+};
+```
 
-fetch('/api/caregiver/attendance/checkin', {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${token}`
-    // Content-Type은 설정하지 않음 (multipart/form-data 자동 설정)
+#### 3. 출근 체크인 (GPS + 사진)
+```javascript
+import { launchCamera } from 'react-native-image-picker';
+import Geolocation from '@react-native-community/geolocation';
+
+const checkIn = async (seniorId) => {
+  try {
+    // 1. GPS 위치 확인
+    const position = await new Promise((resolve, reject) => {
+      Geolocation.getCurrentPosition(resolve, reject);
+    });
+    
+    const { latitude, longitude } = position.coords;
+    
+    // 2. 사진 촬영
+    const imageResult = await new Promise((resolve, reject) => {
+      launchCamera({ mediaType: 'photo', quality: 0.8 }, (response) => {
+        if (response.didCancel || response.error) {
+          reject(response.error);
+        } else {
+          resolve(response.assets[0]);
+        }
+      });
+    });
+    
+    // 3. 서버 전송
+    const formData = new FormData();
+    formData.append('senior_id', seniorId);
+    formData.append('location', '현재 위치');
+    formData.append('gps_lat', latitude);
+    formData.append('gps_lng', longitude);
+    formData.append('photo', {
+      uri: imageResult.uri,
+      type: imageResult.type,
+      name: imageResult.fileName || 'checkin.jpg',
+    });
+    
+    const token = await AsyncStorage.getItem('access_token');
+    const response = await fetch(`${BASE_URL}/api/caregiver/attendance/checkin`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data',
+      },
+      body: formData,
+    });
+    
+    if (response.ok) {
+      Alert.alert('성공', '출근 체크가 완료되었습니다.');
+    }
+    
+  } catch (error) {
+    Alert.alert('오류', '출근 체크에 실패했습니다.');
+    console.error('Check-in error:', error);
+  }
+};
+```
+
+#### 4. 체크리스트 제출
+```javascript
+const submitChecklist = async (seniorId, responses) => {
+  try {
+    const token = await AsyncStorage.getItem('access_token');
+    const response = await fetch(`${BASE_URL}/api/caregiver/checklist`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        senior_id: seniorId,
+        responses: responses
+      })
+    });
+    
+    if (response.ok) {
+      Alert.alert('성공', '체크리스트가 제출되었습니다.');
+      return true;
+    }
+  } catch (error) {
+    Alert.alert('오류', '체크리스트 제출에 실패했습니다.');
+    return false;
+  }
+};
+
+// 사용 예제
+const checklistData = [
+  {
+    question_key: "blood_pressure_check",
+    question_text: "혈압을 측정했나요?",
+    answer: { value: true, systolic: 120, diastolic: 80 },
+    notes: "정상 범위"
   },
-  body: formData
+  {
+    question_key: "mood_check",
+    question_text: "기분 상태는 어떤가요?",
+    answer: { value: "good", mood_scale: 4 },
+    notes: "밝고 활기차심"
+  }
+];
+
+await submitChecklist(1, checklistData);
+```
+
+#### 5. 가디언 리포트 조회
+```javascript
+const ReportList = () => {
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  
+  const loadReports = async (pageNum = 1) => {
+    setLoading(true);
+    try {
+      const token = await AsyncStorage.getItem('access_token');
+      const response = await fetch(
+        `${BASE_URL}/api/guardian/reports?page=${pageNum}&size=20`,
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (pageNum === 1) {
+          setReports(data.items);
+        } else {
+          setReports(prev => [...prev, ...data.items]);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load reports:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // 무한 스크롤 구현
+  const loadMore = () => {
+    if (!loading) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      loadReports(nextPage);
+    }
+  };
+  
+  // UI 렌더링...
+};
+```
+
+---
+
+## 🔔 실시간 알림 (예정)
+
+### WebSocket 연결 (향후 구현)
+```javascript
+import io from 'socket.io-client';
+
+const connectWebSocket = (token) => {
+  const socket = io(BASE_URL, {
+    auth: { token }
+  });
+  
+  socket.on('notification', (data) => {
+    // 푸시 알림 표시
+    showPushNotification(data);
+  });
+  
+  socket.on('report_generated', (data) => {
+    // 새 리포트 알림
+    refreshReportList();
+  });
+  
+  return socket;
+};
+```
+
+---
+
+## 🏗️ 개발 팁
+
+### 1. 상태 관리 추천 구조
+```javascript
+// Redux store 구조 예제
+const store = {
+  auth: {
+    token: null,
+    userType: null,
+    userInfo: null,
+    isAuthenticated: false
+  },
+  caregiver: {
+    homeData: null,
+    seniors: [],
+    currentSession: null
+  },
+  guardian: {
+    reports: [],
+    seniors: [],
+    notifications: []
+  }
+};
+```
+
+### 2. API 호출 유틸리티
+```javascript
+// api.js
+const createApiClient = (baseURL, token) => ({
+  get: (url) => fetch(`${baseURL}${url}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  }),
+  
+  post: (url, data) => fetch(`${baseURL}${url}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(data)
+  }),
+  
+  upload: (url, formData) => fetch(`${baseURL}${url}`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: formData
+  })
 });
 ```
 
-### 지원하는 파일 형식
-- **이미지**: JPG, JPEG, PNG, GIF
-- **최대 크기**: 10MB
-- **응답**: 업로드된 파일 URL 반환
-
-## 🔄 페이지네이션
-
-모든 목록 API는 페이지네이션을 지원합니다:
-
+### 3. 에러 바운더리
 ```javascript
-GET /api/guardian/reports?page=1&size=20&sort_by=created_at&sort_order=desc
-
-// 응답
-{
-  "success": true,
-  "items": [...],
-  "total": 100,
-  "page": 1,
-  "size": 20,
-  "has_next": true,
-  "has_previous": false,
-  "total_pages": 5
+class APIErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+  
+  componentDidCatch(error, errorInfo) {
+    console.log('API Error:', error, errorInfo);
+    // 에러 리포팅 서비스에 전송
+  }
+  
+  render() {
+    if (this.state.hasError) {
+      return <ErrorScreen onRetry={() => this.setState({ hasError: false })} />;
+    }
+    
+    return this.props.children;
+  }
 }
 ```
 
-## 💡 개발 팁
+---
 
-### 1. 토큰 관리
-```javascript
-// 토큰 만료 처리
-const apiCall = async (url, options = {}) => {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Authorization': `Bearer ${getToken()}`,
-      ...options.headers
-    }
-  });
-  
-  if (response.status === 401) {
-    // 토큰 만료 → 로그인 화면으로 이동
-    redirectToLogin();
-    return;
-  }
-  
-  return response.json();
-};
-```
+## 📞 개발 지원
 
-### 2. 에러 처리
-```javascript
-const handleApiError = (error) => {
-  switch (error.error_code) {
-    case 'AUTH_001':
-      showMessage('로그인 정보가 올바르지 않습니다');
-      break;
-    case 'CARE_001':
-      showMessage('시니어 정보를 찾을 수 없습니다');
-      break;
-    default:
-      showMessage('오류가 발생했습니다. 다시 시도해주세요');
-  }
-};
-```
+### 문의 채널
+- **GitHub Issues**: https://github.com/jhon829/sinabro/issues
+- **개발자 이메일**: [개발자 이메일]
+- **Slack 채널**: #goodhands-dev
 
-### 3. 이미지 표시
-```javascript
-// 업로드된 이미지 URL 사용
-const imageUrl = `http://localhost:8000/uploads/${filename}`;
-<img src={imageUrl} alt="케어 사진" />
-```
+### 추가 리소스
+- **Postman Collection**: [링크 제공 예정]
+- **TypeScript 타입 정의**: [링크 제공 예정]
+- **예제 프로젝트**: [링크 제공 예정]
 
-### 4. 실시간 업데이트
-현재는 폴링 방식 권장 (WebSocket은 추후 구현 예정):
+---
 
-```javascript
-// 30초마다 새로운 알림 확인
-setInterval(async () => {
-  const notifications = await fetch('/api/guardian/notifications');
-  updateNotifications(notifications);
-}, 30000);
-```
-
-## 🚀 다음 단계
-
-1. **개발 환경 설정**: API 서버 실행 (`python -m uvicorn app.main:app --reload`)
-2. **Swagger UI 확인**: `http://localhost:8000/docs`에서 API 테스트
-3. **기본 화면 구현**: 로그인 → 홈 화면 → 주요 기능
-4. **점진적 기능 추가**: 출근체크 → 체크리스트 → AI 리포트
-
-## 📞 문의사항
-
-API 관련 문의사항이 있으시면 백엔드 개발자에게 연락해주세요!
-- Swagger UI에서 실시간 테스트 가능
-- 모든 엔드포인트는 현재 동작 중
-- 추가 기능 요청 시 언제든 개발 가능
+*이 문서는 Good Hands 프로젝트의 실제 구현을 기반으로 작성되었으며, 지속적으로 업데이트됩니다.*
