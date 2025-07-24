@@ -13,10 +13,11 @@ from app.services.auth import authenticate_user, create_access_token, get_passwo
 from app.exceptions import http_exception_handler, general_exception_handler
 from app.response_models import success_response, LoginResponse
 from app.logging_config import LoggingMiddleware, setup_logging
-from app.api_docs import tags_metadata
 
 # 라우터 임포트
 from app.routers import caregiver, guardian, ai, admin
+
+from app.api_docs import tags_metadata
 
 # 로깅 설정
 setup_logging()
@@ -171,3 +172,4 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+

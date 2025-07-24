@@ -3,7 +3,7 @@ from typing import List
 
 class Settings(BaseSettings):
     # 데이터베이스 설정
-    database_url: str = "postgresql://user:password@localhost/goodhands"
+    database_url: str = "postgresql://user:1234@localhost/goodhands"
     
     # JWT 설정
     secret_key: str = "your-secret-key-here-please-change-in-production"
