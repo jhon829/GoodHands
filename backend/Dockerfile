@@ -18,6 +18,7 @@ COPY app/ ./app/
 COPY uploads/ ./uploads/
 COPY alembic/ ./alembic/
 COPY alembic.ini ./
+COPY .env.docker ./.env
 
 # 실행 권한 설정
 RUN mkdir -p uploads logs
