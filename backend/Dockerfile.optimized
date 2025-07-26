@@ -1,0 +1,66 @@
+# Good Hands 백엔드 Docker 이미지
+# 최적화된 멀티스테이지 빌드
+
+# 1단계: 빌드 스테이지
+FROM python:3.13-slim as builder
+
+# 작업 디렉토리 설정
+WORKDIR /app
+
+# 시스템 의존성 설치 (빌드 도구들)
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    default-libmysqlclient-dev \
+    pkg-config \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python 가상환경 생성
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# requirements.txt 복사 및 패키지 설치
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 2단계: 실행 스테이지 (경량화)
+FROM python:3.13-slim
+
+# 논루트 사용자 생성 (보안)
+RUN groupadd -r goodhands && useradd -r -g goodhands goodhands
+
+# 작업 디렉토리 설정
+WORKDIR /app
+
+# 런타임 의존성만 설치
+RUN apt-get update && apt-get install -y \
+    default-mysql-client \
+    libmariadb3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# 빌드 스테이지에서 가상환경 복사
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# 애플리케이션 파일 복사
+COPY --chown=goodhands:goodhands app/ ./app/
+
+# 업로드 및 로그 디렉토리 생성
+RUN mkdir -p uploads logs && \
+    chown -R goodhands:goodhands uploads logs && \
+    chmod 755 uploads logs
+
+# 논루트 사용자로 전환
+USER goodhands
+
+# 포트 노출
+EXPOSE 8000
+
+# 헬스체크 추가
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
+
+# 애플리케이션 실행
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

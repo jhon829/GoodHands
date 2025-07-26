@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # FastAPI 백엔드 (외부 MariaDB 연결)
+  backend:
+    build: 
+      context: .
+      dockerfile: Dockerfile.optimized
+    container_name: goodhands-backend-https
+    environment:
+      # 외부 MariaDB 연결 (이미지에서 확인한 DB 정보)
+      DATABASE_URL: mysql+pymysql://root:${MYSQL_PASSWORD}@49.50.131.188:3306/goodhands
+      SECRET_KEY: GH2025_JWT_SecretKey_4a8f2d7c9b5e3h6j1k8m2n5p
+      ENVIRONMENT: production
+      DEBUG: false
+      BASE_URL: https://pay.gzonesoft.co.kr:10007
+      CORS_ORIGINS: '["https://pay.gzonesoft.co.kr:10007", "https://pay.gzonesoft.co.kr", "http://localhost:3000", "*"]'
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      
+      # 파일 업로드 설정
+      UPLOAD_DIR: uploads
+      MAX_FILE_SIZE: 10485760
+      
+      # 로깅 설정
+      LOG_LEVEL: INFO
+      LOG_FILE: app.log
+    volumes:
+      - goodhands_uploads:/app/uploads
+      - goodhands_logs:/app/logs
+    networks:
+      - goodhands_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    # 외부 네트워크 접근을 위한 추가 설정
+    extra_hosts:
+      - "mariadb-server:49.50.131.188"
+
+  # Nginx with HTTPS (완전한 SSL 설정)
+  nginx:
+    image: nginx:alpine
+    container_name: goodhands-nginx-https
+    ports:
+      - "10007:10007"  # HTTPS
+      - "10008:10008"  # HTTP redirect
+    volumes:
+      - ./nginx_https_final.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - goodhands_uploads:/var/www/uploads:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - goodhands_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:10008"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  goodhands_uploads:
+    name: goodhands_uploads
+  goodhands_logs:
+    name: goodhands_logs
+
+networks:
+  goodhands_network:
+    name: goodhands_network
+    driver: bridge

@@ -431,3 +431,127 @@ async def update_feedback_status(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"피드백 상태 업데이트 중 오류가 발생했습니다: {str(e)}"
         )
+
+# ==========================================
+# 알림 관련 엔드포인트 (서버 동기화)
+# ==========================================
+
+@router.post("/notifications/send-to-guardian")
+async def send_guardian_notification(
+    notification_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """가디언에게 알림 발송"""
+    verify_admin_permission(current_user)
+    
+    try:
+        senior_id = notification_data.get("senior_id")
+        notification_type = notification_data.get("type", "new_ai_report")
+        title = notification_data.get("title", "새로운 알림")
+        content = notification_data.get("content", "")
+        priority = notification_data.get("priority", "normal")
+        
+        # 시니어를 통해 가디언 찾기
+        senior = db.query(Senior).filter(Senior.id == senior_id).first()
+        if not senior or not senior.guardian_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="해당 시니어의 가디언을 찾을 수 없습니다."
+            )
+        
+        # 알림 생성
+        notification = Notification(
+            sender_id=current_user.id,
+            receiver_id=senior.guardian_id,
+            type=notification_type,
+            title=title,
+            content=content,
+            data={"senior_id": senior_id, "priority": priority}
+        )
+        
+        db.add(notification)
+        db.commit()
+        
+        return {
+            "status": "success",
+            "message": "가디언에게 알림이 전송되었습니다.",
+            "notification_id": notification.id
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"알림 전송 중 오류가 발생했습니다: {str(e)}"
+        )
+
+@router.post("/notifications/send-monthly-report")
+async def send_monthly_report_notification(
+    report_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """월간 트렌드 리포트 알림 발송"""
+    verify_admin_permission(current_user)
+    
+    try:
+        senior_id = report_data.get("senior_id")
+        trend_direction = report_data.get("trend_direction", "stable")
+        priority = report_data.get("priority", "medium")
+        
+        # 시니어를 통해 가디언 찾기
+        senior = db.query(Senior).filter(Senior.id == senior_id).first()
+        if not senior or not senior.guardian_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="해당 시니어의 가디언을 찾을 수 없습니다."
+            )
+        
+        # 트렌드에 따른 제목 및 내용 설정
+        trend_messages = {
+            "improving": {
+                "title": "좋은 소식! 건강 상태가 개선되고 있습니다",
+                "content": f"{senior.name}님의 지난 4주간 상태가 지속적으로 개선되고 있습니다."
+            },
+            "declining": {
+                "title": "주의 필요: 건강 상태 변화 감지",
+                "content": f"{senior.name}님의 상태에 변화가 감지되었습니다. 상세한 분석 리포트를 확인해보세요."
+            },
+            "stable": {
+                "title": "월간 건강 리포트 업데이트",
+                "content": f"{senior.name}님의 지난 4주간 상태가 안정적으로 유지되고 있습니다."
+            }
+        }
+        
+        message_info = trend_messages.get(trend_direction, trend_messages["stable"])
+        
+        # 알림 생성
+        notification = Notification(
+            sender_id=current_user.id,
+            receiver_id=senior.guardian_id,
+            type="monthly_trend_report",
+            title=message_info["title"],
+            content=message_info["content"],
+            data={
+                "senior_id": senior_id,
+                "trend_direction": trend_direction,
+                "priority": priority,
+                "report_type": "monthly_trend"
+            }
+        )
+        
+        db.add(notification)
+        db.commit()
+        
+        return {
+            "status": "success",
+            "message": "월간 리포트 알림이 전송되었습니다.",
+            "notification_id": notification.id,
+            "trend_direction": trend_direction
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"월간 리포트 알림 전송 중 오류가 발생했습니다: {str(e)}"
+        )

@@ -1,0 +1,14 @@
+# SSL 키 파일 암호 제거 스크립트
+# 비밀번호: hwang0609!
+
+# Windows에서 OpenSSL 사용하여 암호화된 키 파일의 암호를 제거하는 방법:
+
+# 1. OpenSSL이 설치되어 있지 않다면 Git Bash를 사용하거나
+# 2. Docker 컨테이너 내에서 실행
+
+# 명령어:
+# openssl rsa -in ssl/ssl.key -out ssl/ssl_decrypted.key
+
+# 비밀번호 입력: hwang0609!
+
+# 참고: 이 작업은 보안상 중요하므로 안전한 환경에서만 수행

@@ -13,13 +13,36 @@ from app.services.auth import authenticate_user, create_access_token, get_passwo
 from app.exceptions import http_exception_handler, general_exception_handler
 from app.response_models import success_response, LoginResponse
 from app.logging_config import LoggingMiddleware, setup_logging
-from app.api_docs import tags_metadata
 
 # 라우터 임포트
 from app.routers import caregiver, guardian, ai, admin
 
 # 로깅 설정
 setup_logging()
+
+# 태그 설명 정의
+tags_metadata = [
+    {
+        "name": "auth",
+        "description": "사용자 인증 관련 API (로그인, 회원가입)",
+    },
+    {
+        "name": "caregiver", 
+        "description": "케어기버 전용 API (출근/퇴근, 체크리스트, 돌봄노트)",
+    },
+    {
+        "name": "guardian",
+        "description": "가디언 전용 API (리포트 조회, 피드백 전송)",
+    },
+    {
+        "name": "ai",
+        "description": "AI 분석 관련 API (리포트 생성, 추이 분석)",
+    },
+    {
+        "name": "admin",
+        "description": "관리자 전용 API (사용자 관리, 시스템 설정)",
+    }
+]
 
 # FastAPI 앱 생성 (문서화 개선)
 app = FastAPI(

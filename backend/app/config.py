@@ -2,8 +2,8 @@ from pydantic_settings import BaseSettings
 from typing import List
 
 class Settings(BaseSettings):
-    # 데이터베이스 설정
-    database_url: str = "postgresql://user:password@localhost/goodhands"
+    # 데이터베이스 설정 (외부 MariaDB)
+    database_url: str = "mysql+pymysql://root:password@49.50.131.188:3306/goodhands"
     
     # JWT 설정
     secret_key: str = "your-secret-key-here-please-change-in-production"

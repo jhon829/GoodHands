@@ -388,3 +388,121 @@ async def get_trend_analysis(
         "analysis_date": datetime.now().isoformat(),
         "trend_analysis": analysis
     }
+
+# ==========================================
+# 알림 관련 엔드포인트 (서버 동기화)
+# ==========================================
+
+@router.get("/notifications")
+async def get_notifications(
+    unread_only: bool = False,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """알림 목록 조회"""
+    
+    if not current_user.guardian_profile:
+        raise HTTPException(status_code=403, detail="가디언 권한이 필요합니다")
+    
+    try:
+        query = db.query(Notification).filter(
+            Notification.receiver_id == current_user.guardian_profile.id
+        )
+        
+        if unread_only:
+            query = query.filter(Notification.is_read == False)
+        
+        notifications = query.order_by(Notification.created_at.desc()).all()
+        
+        return [
+            {
+                "id": notification.id,
+                "title": notification.title,
+                "content": notification.content,
+                "type": notification.type,
+                "sender_id": notification.sender_id,
+                "receiver_id": notification.receiver_id,
+                "data": notification.data,
+                "is_read": notification.is_read,
+                "read_at": notification.read_at,
+                "created_at": notification.created_at
+            } for notification in notifications
+        ]
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"알림 목록 조회 중 오류가 발생했습니다: {str(e)}"
+        )
+
+@router.put("/notifications/{notification_id}/read")
+async def mark_notification_read(
+    notification_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """알림 읽음 처리"""
+    
+    if not current_user.guardian_profile:
+        raise HTTPException(status_code=403, detail="가디언 권한이 필요합니다")
+    
+    try:
+        notification = db.query(Notification).filter(
+            Notification.id == notification_id,
+            Notification.receiver_id == current_user.guardian_profile.id
+        ).first()
+        
+        if not notification:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="알림을 찾을 수 없습니다."
+            )
+        
+        notification.is_read = True
+        notification.read_at = datetime.utcnow()
+        
+        db.commit()
+        
+        return {"message": "알림이 읽음 처리되었습니다."}
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"알림 읽음 처리 중 오류가 발생했습니다: {str(e)}"
+        )
+
+@router.get("/feedback/history")
+async def get_feedback_history(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """피드백 이력 조회"""
+    
+    if not current_user.guardian_profile:
+        raise HTTPException(status_code=403, detail="가디언 권한이 필요합니다")
+    
+    try:
+        feedbacks = db.query(Feedback).filter(
+            Feedback.guardian_id == current_user.guardian_profile.id
+        ).order_by(Feedback.created_at.desc()).all()
+        
+        return {
+            "feedbacks": [
+                {
+                    "id": feedback.id,
+                    "message": feedback.message,
+                    "requirements": feedback.requirements,
+                    "report_id": feedback.report_id,
+                    "status": feedback.status,
+                    "created_at": feedback.created_at,
+                    "updated_at": feedback.updated_at
+                } for feedback in feedbacks
+            ],
+            "total_count": len(feedbacks)
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"피드백 이력 조회 중 오류가 발생했습니다: {str(e)}"
+        )
