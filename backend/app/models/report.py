@@ -3,9 +3,10 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
 
-# AI 리포트 관련 모델
+# AI 리포트 관련 모델 (MariaDB 최적화)
 class AIReport(Base):
     __tablename__ = "ai_reports"
+    __table_args__ = {'mysql_charset': 'utf8mb4', 'mysql_collate': 'utf8mb4_unicode_ci'}
     
     id = Column(Integer, primary_key=True, index=True)
     care_session_id = Column(Integer, ForeignKey("care_sessions.id"), nullable=False)
@@ -29,6 +30,7 @@ class AIReport(Base):
 
 class Feedback(Base):
     __tablename__ = "feedbacks"
+    __table_args__ = {'mysql_charset': 'utf8mb4', 'mysql_collate': 'utf8mb4_unicode_ci'}
     
     id = Column(Integer, primary_key=True, index=True)
     ai_report_id = Column(Integer, ForeignKey("ai_reports.id"), nullable=False)
@@ -45,6 +47,7 @@ class Feedback(Base):
 
 class Notification(Base):
     __tablename__ = "notifications"
+    __table_args__ = {'mysql_charset': 'utf8mb4', 'mysql_collate': 'utf8mb4_unicode_ci'}
     
     id = Column(Integer, primary_key=True, index=True)
     sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)

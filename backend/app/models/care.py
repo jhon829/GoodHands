@@ -3,9 +3,10 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
 
-# 돌봄 세션 관련 모델
+# 돌봄 세션 관련 모델 (MariaDB 최적화)
 class CareSession(Base):
     __tablename__ = "care_sessions"
+    __table_args__ = {'mysql_charset': 'utf8mb4', 'mysql_collate': 'utf8mb4_unicode_ci'}
     
     id = Column(Integer, primary_key=True, index=True)
     caregiver_id = Column(Integer, ForeignKey("caregivers.id"), nullable=False)
@@ -25,6 +26,7 @@ class CareSession(Base):
 
 class AttendanceLog(Base):
     __tablename__ = "attendance_logs"
+    __table_args__ = {'mysql_charset': 'utf8mb4', 'mysql_collate': 'utf8mb4_unicode_ci'}
     
     id = Column(Integer, primary_key=True, index=True)
     care_session_id = Column(Integer, ForeignKey("care_sessions.id"), nullable=False)
@@ -40,6 +42,7 @@ class AttendanceLog(Base):
 
 class ChecklistResponse(Base):
     __tablename__ = "checklist_responses"
+    __table_args__ = {'mysql_charset': 'utf8mb4', 'mysql_collate': 'utf8mb4_unicode_ci'}
     
     id = Column(Integer, primary_key=True, index=True)
     care_session_id = Column(Integer, ForeignKey("care_sessions.id"), nullable=False)
@@ -57,6 +60,7 @@ class ChecklistResponse(Base):
 
 class CareNote(Base):
     __tablename__ = "care_notes"
+    __table_args__ = {'mysql_charset': 'utf8mb4', 'mysql_collate': 'utf8mb4_unicode_ci'}
     
     id = Column(Integer, primary_key=True, index=True)
     care_session_id = Column(Integer, ForeignKey("care_sessions.id"), nullable=False)
